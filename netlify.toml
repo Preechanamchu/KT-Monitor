@@ -1,0 +1,9 @@
+[build]
+  command = ""  # ลบคำสั่ง npm run build ออก เพราะ HTML ไม่ต้อง build
+  publish = "." # บอกให้ Netlify ใช้ไฟล์ในโฟลเดอร์ปัจจุบัน (Root) ขึ้นเว็บเลย
+  functions = "functions"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
