@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KT Monitor System v6.0</title>
+    
+    <!-- CSS Libraries -->
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- FontAwesome for Map Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 font-sans overflow-hidden h-screen w-full relative">
+
+    <!-- 1. MAP CONTAINER -->
+    <div id="map-container" class="absolute inset-0 z-0 w-full h-full bg-slate-200"></div>
+
+    <!-- 2. SEARCH BAR -->
+    <div class="absolute top-4 left-4 z-50 w-96 max-w-[calc(100vw-2rem)]">
+        <div class="bg-white rounded-lg shadow-xl flex items-center p-0.5 border border-transparent focus-within:border-blue-500 transition-all">
+            <button id="btn-toggle-sidebar" class="p-3 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+            <div class="flex-1 relative">
+                <input type="text" id="search-input" placeholder="ค้นหาสถานที่..." class="w-full px-2 py-3 text-sm outline-none text-slate-700 placeholder-slate-400 bg-transparent" autocomplete="off">
+            </div>
+            <div class="flex items-center px-2 border-l border-slate-100" id="search-icon-container">
+                <button class="p-2 text-blue-600 hover:bg-blue-50 rounded-full">
+                    <i data-lucide="search" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+        <!-- Search Suggestions / History -->
+        <div id="search-suggestions" class="hidden mt-1 bg-white rounded-lg shadow-xl border-t border-slate-100 overflow-hidden py-2 animate-fade-in-up max-h-[60vh] overflow-y-auto custom-scrollbar"></div>
+    </div>
+
+    <!-- 3. SIDEBAR -->
+    <div id="sidebar" class="absolute top-24 left-4 bottom-8 w-96 bg-white rounded-xl shadow-2xl z-40 transform transition-transform duration-300 flex flex-col overflow-hidden border border-slate-200 translate-x-0">
+        <!-- Tabs -->
+        <div class="flex border-b border-slate-200 bg-white">
+            <button id="tab-dashboard" class="flex-1 py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600 transition-colors">ปฏิบัติการ</button>
+            <button id="tab-admin" class="flex-1 py-3 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors">Admin</button>
+            <button id="tab-settings" class="flex-1 py-3 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors"><i data-lucide="settings" class="w-4 h-4 mx-auto"></i></button>
+        </div>
+
+        <!-- Content Area -->
+        <div class="flex-1 overflow-y-auto p-0 bg-slate-50 custom-scrollbar relative">
+            
+            <!-- Dashboard Content -->
+            <div id="view-dashboard" class="p-4 space-y-4">
+                <div id="dashboard-empty-state" class="text-center py-10 opacity-60">
+                    <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" class="w-16 h-16 mx-auto mb-3 opacity-50 grayscale" alt="" />
+                    <p class="text-slate-500 text-sm">ค้นหาสถานที่ หรือ คลิกบนแผนที่<br>เพื่อแจ้งจุดเกิดเหตุ</p>
+                </div>
+                
+                <div id="dashboard-active-state" class="hidden space-y-3">
+                    <div class="bg-red-50 p-3 rounded-lg border border-red-100 shadow-sm">
+                        <div class="flex justify-between items-center pb-2 border-b border-red-100 mb-2">
+                            <span class="text-sm font-bold text-red-600 flex items-center gap-2">
+                                <i data-lucide="siren" class="w-5 h-5 animate-pulse"></i> จุดเกิดเหตุ (ฉุกเฉิน)
+                            </span>
+                            <button id="btn-clear-incident" class="text-xs bg-white border border-red-200 text-red-500 hover:bg-red-50 px-2 py-1 rounded">จบภารกิจ</button>
+                        </div>
+                        <div class="text-xs text-slate-600">
+                            <span class="font-semibold">พิกัด:</span> <span id="incident-coords-display">...</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between text-xs text-slate-400 uppercase tracking-wider font-semibold mt-4">
+                        <span>เจ้าหน้าที่ใกล้เคียง</span>
+                        <span>ระยะทาง</span>
+                    </div>
+                    <div id="nearby-staff-list" class="space-y-2">
+                        <!-- รายชื่อพนักงานใกล้เคียง -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Content -->
+            <div id="view-admin" class="hidden p-4 h-full">
+                <!-- Login Form -->
+                <div id="admin-login-view" class="flex flex-col items-center justify-center h-full space-y-4 py-10">
+                    <div class="bg-slate-200 p-3 rounded-full"><i data-lucide="lock" class="w-6 h-6 text-slate-500"></i></div>
+                    <form id="form-login" class="w-full px-4 text-center">
+                        <div class="mb-4 text-sm font-medium text-slate-600">Admin PIN (210406)</div>
+                        <input type="password" id="input-pin" class="w-full text-center text-xl tracking-[0.5em] border rounded-lg py-2 focus:ring-2 focus:ring-blue-500 outline-none" maxLength="6">
+                        <div id="login-error" class="text-red-500 text-xs mt-2 hidden"></div>
+                        <button type="submit" class="mt-4 w-full bg-slate-800 text-white py-2 rounded-lg text-sm hover:bg-slate-900 shadow-lg">เข้าสู่ระบบ</button>
+                    </form>
+                </div>
+
+                <!-- Admin Panel -->
+                <div id="admin-panel-view" class="hidden space-y-4">
+                    <div class="flex justify-between items-center bg-emerald-50 p-2 rounded border border-emerald-200">
+                        <span class="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                            <i data-lucide="shield-check" class="w-3 h-3"></i> Admin Access
+                        </span>
+                        <button id="btn-logout" class="text-xs text-red-500 flex items-center gap-1 hover:underline">
+                            <i data-lucide="log-out" class="w-3 h-3"></i> ออก
+                        </button>
+                    </div>
+                    <button id="btn-open-add-modal" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> เพิ่มพนักงานใหม่
+                    </button>
+                    
+                    <div class="relative">
+                        <input type="text" id="filter-staff" placeholder="ค้นหาพนักงาน..." class="w-full pl-8 pr-3 py-2 bg-white border rounded-lg text-xs outline-none focus:border-blue-500">
+                        <i data-lucide="search" class="w-3 h-3 text-slate-400 absolute left-2.5 top-2.5"></i>
+                    </div>
+
+                    <div id="admin-staff-list" class="space-y-2 pb-10">
+                        <!-- รายชื่อพนักงาน -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Content -->
+            <div id="view-settings" class="hidden p-4 h-full">
+                <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                    <i data-lucide="settings-2" class="w-5 h-5"></i> ตั้งค่าทั่วไป
+                </h3>
+                
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block">ไอคอนจุดเกิดเหตุ (Accident Icon)</label>
+                        <div class="grid grid-cols-5 gap-2" id="accident-icon-selector">
+                            <!-- จะถูกสร้างด้วย JS -->
+                        </div>
+                    </div>
+                    
+                    <div class="pt-4 border-t border-slate-100">
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block">จัดการข้อมูล</label>
+                        <button onclick="resetSystemData()" class="w-full py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded text-xs font-bold transition-colors">
+                            <i data-lucide="trash" class="w-3 h-3 inline mr-1"></i> ล้างข้อมูลทั้งหมด (Reset Factory)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <div id="app-version" class="p-2 border-t border-slate-200 bg-white text-[10px] text-center text-slate-400">
+            KT Monitor v6.0 (Persistent & Icons)
+        </div>
+    </div>
+
+    <!-- 4. MAP CONTROLS -->
+    <div class="absolute top-4 right-4 z-50 flex gap-2">
+        <div class="bg-white rounded shadow-md p-1 flex">
+            <button id="btn-map-roadmap" class="px-3 py-1 text-xs font-medium rounded bg-blue-100 text-blue-700 transition-colors">แผนที่</button>
+            <button id="btn-map-satellite" class="px-3 py-1 text-xs font-medium rounded text-slate-600 hover:bg-slate-100 transition-colors">ดาวเทียม</button>
+        </div>
+    </div>
+
+    <!-- 5. MODAL (เพิ่ม/แก้ไขพนักงาน) -->
+    <div id="modal-staff" class="hidden absolute inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden animate-scale-in">
+            <div class="bg-slate-800 p-4 flex justify-between items-center text-white">
+                <h3 id="modal-title" class="font-bold text-sm flex items-center gap-2"><i data-lucide="user-plus" class="w-4 h-4"></i> เพิ่มพนักงาน</h3>
+                <button id="btn-close-modal" class="hover:text-slate-300 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-4 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                
+                <!-- 1. ข้อมูลพื้นฐาน -->
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="relative group cursor-pointer w-16 h-16 flex-shrink-0">
+                            <div class="w-16 h-16 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden">
+                                <img id="preview-image" src="" class="w-full h-full object-cover hidden" />
+                                <i id="placeholder-image" data-lucide="camera" class="w-6 h-6 text-slate-400"></i>
+                            </div>
+                            <input type="file" id="input-image" accept="image/png, image/jpeg" class="absolute inset-0 opacity-0 cursor-pointer">
+                        </div>
+                        <div class="flex-1 space-y-2">
+                            <input type="hidden" id="input-id">
+                            <input type="text" id="input-name" placeholder="ชื่อ-นามสกุล" class="w-full border border-slate-200 p-2 rounded text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition-all">
+                            <input type="text" id="input-phone" placeholder="เบอร์โทรศัพท์" class="w-full border border-slate-200 p-2 rounded text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. เลือกไอคอนพาหนะ (New Feature) -->
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">ประเภทพาหนะ / ไอคอน</label>
+                    <div class="grid grid-cols-5 gap-2" id="staff-icon-selector">
+                        <!-- ตัวเลือกไอคอนจะถูกสร้างด้วย JS -->
+                    </div>
+                </div>
+                
+                <!-- 3. พิกัด -->
+                <div class="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <div class="flex items-center gap-2 mb-2 text-slate-700 font-bold">
+                        <i data-lucide="map-pin" class="w-3 h-3 text-blue-500"></i>
+                        <span>ระบุพิกัดประจำการ</span>
+                    </div>
+                    
+                    <div class="flex gap-2 mb-2">
+                        <div class="relative flex-1">
+                            <input type="text" id="input-coords" placeholder="วางลิงก์ Google Maps / พิกัด..." class="w-full bg-white border border-slate-300 rounded p-2 pl-8 text-xs focus:border-blue-500 outline-none">
+                            <i data-lucide="search-code" class="w-3 h-3 text-slate-400 absolute left-2.5 top-2.5"></i>
+                        </div>
+                        <button id="btn-find-coords" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap shadow-sm">
+                            ค้นหา
+                        </button>
+                    </div>
+                    
+                    <div class="flex justify-between items-center bg-white p-2 rounded border border-slate-100">
+                        <div id="coords-display" class="text-[10px] text-slate-400 font-mono">ยังไม่ได้ระบุตำแหน่ง</div>
+                        <div id="location-status" class="text-[10px]"></div>
+                    </div>
+                </div>
+
+                <button id="btn-save-staff" class="w-full bg-slate-800 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-slate-900 transition-colors shadow-lg flex justify-center items-center gap-2">
+                    <i data-lucide="save" class="w-4 h-4"></i> บันทึกข้อมูล
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Main Script -->
+    <script src="script.js"></script>
+</body>
+</html>
