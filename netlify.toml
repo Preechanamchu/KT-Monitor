@@ -1,11 +1,9 @@
 [build]
-  command = "npm run build"
-  publish = "."
-  functions = "functions"
+  command = ""  # ไม่ต้อง Build อะไร เพราะเป็นไฟล์ HTML ธรรมดา
+  publish = "." # โฟลเดอร์ที่จะแสดงผลคือโฟลเดอร์ปัจจุบัน (Root)
+  functions = "functions" # โฟลเดอร์เก็บ API
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
-
   status = 200
-
